@@ -98,13 +98,20 @@ const AnalyticsFilterPage = () => {
     };
 
     return (
-        <div style={{ padding: "20px" }}>
-            <h1>Analytics Filter System</h1>
-            {isLoading && <p>加载中...</p>}
-            {error && <p style={{ color: "red" }}>{error}</p>}
-            {validationResult && <p style={{ color: validationResult.startsWith("Filters applied") ? "green" : "red" }}>{validationResult}</p>}
+        <div className="p-5">
+            <h1 className="text-2xl font-bold mb-5">Analytics Filter System</h1>
+            {isLoading && <p className="text-blue-500">加载中...</p>}
+            {error && <p className="text-red-500">{error}</p>}
+            {validationResult && (
+                <p
+                    className={`${validationResult.startsWith("Filters applied") ? "text-green-500" : "text-red-500"
+                        }`}
+                >
+                    {validationResult}
+                </p>
+            )}
             <div>
-                <h3>Modules</h3>
+                <h3 className="text-lg font-semibold mb-2">Modules</h3>
                 <MultiSelect
                     options={modules.map((module) => ({
                         label: module.title,
@@ -114,8 +121,8 @@ const AnalyticsFilterPage = () => {
                     onChange={setSelectedModules}
                 />
             </div>
-            <div>
-                <h3>Units</h3>
+            <div className="mt-4">
+                <h3 className="text-lg font-semibold mb-2">Units</h3>
                 <MultiSelect
                     options={units.map((unit) => ({
                         label: unit.name,
@@ -125,8 +132,8 @@ const AnalyticsFilterPage = () => {
                     onChange={setSelectedUnits}
                 />
             </div>
-            <div>
-                <h3>Locations</h3>
+            <div className="mt-4">
+                <h3 className="text-lg font-semibold mb-2">Locations</h3>
                 <MultiSelect
                     options={locations.map((location) => ({
                         label: location.name,
@@ -136,21 +143,26 @@ const AnalyticsFilterPage = () => {
                     onChange={setSelectedLocations}
                 />
             </div>
-            <div style={{ marginTop: "20px" }}>
+            <div className="mt-6">
                 <button
                     onClick={handleApplyFilters}
-                    style={{ marginLeft: "10px" }}
+                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
                     disabled={isLoading || (!selectedModules.length && !selectedUnits.length && !selectedLocations.length)}
                 >
                     Apply
                 </button>
-                <button onClick={handleResetFilters} disabled={isLoading}>
+                <button
+                    onClick={handleResetFilters}
+                    className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700 ml-2 disabled:opacity-50"
+                    disabled={isLoading}
+                >
                     Reset
                 </button>
             </div>
         </div>
     );
-};
+}
+
 
 export default AnalyticsFilterPage;
 
