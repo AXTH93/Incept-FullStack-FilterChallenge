@@ -1,101 +1,160 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+import { useState, useEffect } from "react";
+import MultiSelect from "./components/MultiSelect";
+import { fetchModules, fetchUnits, fetchLocations, validateFilters } from "./api/filters";
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+interface Module {
+    id: number;
+    title: string;
 }
+
+interface Unit {
+    id: number;
+    name: string;
+}
+
+interface Location {
+    id: number;
+    name: string;
+}
+
+const AnalyticsFilterPage = () => {
+    // 筛选器选项
+    const [modules, setModules] = useState<Module[]>([]);
+    const [units, setUnits] = useState<Unit[]>([]);
+    const [locations, setLocations] = useState<Location[]>([]);
+
+    // 已选值
+    const [selectedModules, setSelectedModules] = useState<number[]>([]);
+    const [selectedUnits, setSelectedUnits] = useState<number[]>([]);
+    const [selectedLocations, setSelectedLocations] = useState<number[]>([]);
+
+    // 加载状态
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [validationResult, setValidationResult] = useState<string | null>(null); // 验证结果
+
+    // 加载数据的通用函数
+    const fetchData = async () => {
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const [modulesData, unitsData, locationsData] = await Promise.all([
+                fetchModules(selectedUnits, selectedLocations),
+                fetchUnits(selectedModules, selectedLocations),
+                fetchLocations(selectedModules, selectedUnits),
+            ]);
+
+            setModules(modulesData);
+            setUnits(unitsData);
+            setLocations(locationsData);
+        } catch (err) {
+            setError("数据加载失败，请稍后重试。");
+            console.error("Error fetching data:", err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // 初始加载所有筛选项
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    // 每当筛选条件变化时重新加载数据
+    useEffect(() => {
+        fetchData();
+    }, [selectedModules, selectedUnits, selectedLocations]);
+
+    // Apply Filter 按钮的事件处理函数
+    const handleApplyFilters = async () => {
+        setValidationResult(null);
+        setError(null);
+
+        try {
+            const result = await validateFilters(selectedModules, selectedUnits, selectedLocations);
+
+            if (result.valid) {
+                setValidationResult("Filters applied successfully!");
+            } else {
+                setValidationResult(
+                    `Validation failed: ${result.errors?.join(", ") || "Unknown errors"}`
+                );
+            }
+        } catch (error) {
+            setError("Failed to validate filters. Please try again.");
+            console.error("Error applying filters:", error);
+        }
+    };
+
+    // 重置筛选
+    const handleResetFilters = () => {
+        setSelectedModules([]);
+        setSelectedUnits([]);
+        setSelectedLocations([]);
+        fetchData();
+    };
+
+    return (
+        <div style={{ padding: "20px" }}>
+            <h1>Analytics Filter System</h1>
+            {isLoading && <p>加载中...</p>}
+            {error && <p style={{ color: "red" }}>{error}</p>}
+            {validationResult && <p style={{ color: validationResult.startsWith("Filters applied") ? "green" : "red" }}>{validationResult}</p>}
+            <div>
+                <h3>Modules</h3>
+                <MultiSelect
+                    options={modules.map((module) => ({
+                        label: module.title,
+                        value: module.id,
+                    }))}
+                    selected={selectedModules}
+                    onChange={setSelectedModules}
+                />
+            </div>
+            <div>
+                <h3>Units</h3>
+                <MultiSelect
+                    options={units.map((unit) => ({
+                        label: unit.name,
+                        value: unit.id,
+                    }))}
+                    selected={selectedUnits}
+                    onChange={setSelectedUnits}
+                />
+            </div>
+            <div>
+                <h3>Locations</h3>
+                <MultiSelect
+                    options={locations.map((location) => ({
+                        label: location.name,
+                        value: location.id,
+                    }))}
+                    selected={selectedLocations}
+                    onChange={setSelectedLocations}
+                />
+            </div>
+            <div style={{ marginTop: "20px" }}>
+                <button
+                    onClick={handleApplyFilters}
+                    style={{ marginLeft: "10px" }}
+                    disabled={isLoading || (!selectedModules.length && !selectedUnits.length && !selectedLocations.length)}
+                >
+                    Apply
+                </button>
+                <button onClick={handleResetFilters} disabled={isLoading}>
+                    Reset
+                </button>
+            </div>
+        </div>
+    );
+};
+
+export default AnalyticsFilterPage;
+
+
+
+
+
