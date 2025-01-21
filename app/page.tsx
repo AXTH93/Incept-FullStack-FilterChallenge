@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import MultiSelect from "./components/MultiSelect";
 import { fetchModules, fetchUnits, fetchLocations, validateFilters } from "./api/filters";
+import debounce from "lodash/debounce";
 
 interface Module {
     id: number;
@@ -20,62 +21,90 @@ interface Location {
 }
 
 const AnalyticsFilterPage = () => {
-    // 筛选器选项
-    const [modules, setModules] = useState<Module[]>([]);
-    const [units, setUnits] = useState<Unit[]>([]);
-    const [locations, setLocations] = useState<Location[]>([]);
+    // State for filter options
+    const [modules, setModules] = useState<Module[]>([]); // List of available modules
+    const [units, setUnits] = useState<Unit[]>([]); // List of available units
+    const [locations, setLocations] = useState<Location[]>([]); // List of available locations
 
-    // 已选值
-    const [selectedModules, setSelectedModules] = useState<number[]>([]);
-    const [selectedUnits, setSelectedUnits] = useState<number[]>([]);
-    const [selectedLocations, setSelectedLocations] = useState<number[]>([]);
+    const [selectedModules, setSelectedModules] = useState<number[]>([]); // Selected module IDs
+    const [selectedUnits, setSelectedUnits] = useState<number[]>([]); // Selected unit IDs
+    const [selectedLocations, setSelectedLocations] = useState<number[]>([]); // Selected location IDs
 
-    // 加载状态
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [validationResult, setValidationResult] = useState<string | null>(null); // 验证结果
+    const [isLoading, setIsLoading] = useState(false); // Loading state for data fetching
+    const [error, setError] = useState<string | null>(null); // Error message for data fetching
+    const [validationResult, setValidationResult] = useState<string | null>(null); // Result of filter validation
 
-    // 加载数据的通用函数
-    const fetchData = async () => {
-        setIsLoading(true);
-        setError(null);
+    // Ref to manage loading timeout
+    const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Generic fetchData function with a loading delay
+    const fetchData = async (modules: number[], units: number[], locations: number[]) => {
+        // Clear any previous loading timeout
+        if (loadingTimeoutRef.current) {
+            clearTimeout(loadingTimeoutRef.current);
+        }
+
+        // Set a loading delay: Only show loading state if the request takes longer than 500ms
+        loadingTimeoutRef.current = setTimeout(() => {
+            setIsLoading(true);
+        }, 500);
+
+        setError(null); // Reset any previous errors
 
         try {
+            // Fetch data concurrently for modules, units, and locations
             const [modulesData, unitsData, locationsData] = await Promise.all([
-                fetchModules(selectedUnits, selectedLocations),
-                fetchUnits(selectedModules, selectedLocations),
-                fetchLocations(selectedModules, selectedUnits),
+                fetchModules(units, locations),
+                fetchUnits(modules, locations),
+                fetchLocations(modules, units),
             ]);
 
+            // Update state with the fetched data
             setModules(modulesData);
             setUnits(unitsData);
             setLocations(locationsData);
         } catch (err) {
-            setError("数据加载失败，请稍后重试。");
+            // Handle fetch errors
+            setError("Failed to load data. Please try again.");
             console.error("Error fetching data:", err);
         } finally {
-            setIsLoading(false);
+            // Clear the loading timeout when the request finishes
+            if (loadingTimeoutRef.current) {
+                clearTimeout(loadingTimeoutRef.current);
+            }
+            setIsLoading(false); // Reset loading state
         }
     };
 
-    // 初始加载所有筛选项
-    useEffect(() => {
-        fetchData();
-    }, []);
+    // UseMemo to optimize debounce with a delay of 800ms
+    const fetchDataWithDebounce = useMemo(
+        () =>
+            debounce((modules: number[], units: number[], locations: number[]) => {
+                fetchData(modules, units, locations);
+            }, 800),
+        [] // Dependencies are empty to ensure the debounce function is only created once
+    );
 
-    // 每当筛选条件变化时重新加载数据
+    // Effect to trigger data fetching when filters change
     useEffect(() => {
-        fetchData();
+        fetchDataWithDebounce(selectedModules, selectedUnits, selectedLocations);
+
+        return () => {
+            // Cleanup
+            fetchDataWithDebounce.cancel();
+            if (loadingTimeoutRef.current) {
+                clearTimeout(loadingTimeoutRef.current);
+            }
+        };
     }, [selectedModules, selectedUnits, selectedLocations]);
 
-    // Apply Filter 按钮的事件处理函数
+    // Handle Apply Filters
     const handleApplyFilters = async () => {
         setValidationResult(null);
         setError(null);
 
         try {
             const result = await validateFilters(selectedModules, selectedUnits, selectedLocations);
-
             if (result.valid) {
                 setValidationResult("Filters applied successfully!");
             } else {
@@ -89,24 +118,22 @@ const AnalyticsFilterPage = () => {
         }
     };
 
-    // 重置筛选
+    // Handle Reset Filters
     const handleResetFilters = () => {
         setSelectedModules([]);
         setSelectedUnits([]);
         setSelectedLocations([]);
-        fetchData();
+        fetchData([], [], []);
     };
+
 
     return (
         <div className="p-5">
             <h1 className="text-2xl font-bold mb-5">Analytics Filter System</h1>
-            {isLoading && <p className="text-blue-500">加载中...</p>}
+            {isLoading && <p className="text-blue-500">Loading...</p>}
             {error && <p className="text-red-500">{error}</p>}
             {validationResult && (
-                <p
-                    className={`${validationResult.startsWith("Filters applied") ? "text-green-500" : "text-red-500"
-                        }`}
-                >
+                <p className={`${validationResult.startsWith("Filters applied") ? "text-green-500" : "text-red-500"}`}>
                     {validationResult}
                 </p>
             )}
@@ -161,12 +188,6 @@ const AnalyticsFilterPage = () => {
             </div>
         </div>
     );
-}
-
+};
 
 export default AnalyticsFilterPage;
-
-
-
-
-
