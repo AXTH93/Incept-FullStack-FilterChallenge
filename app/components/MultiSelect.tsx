@@ -1,19 +1,18 @@
-// 更新 MultiSelect 接口
 interface MultiSelectProps {
     options: { label: string; value: number }[];
     selected: number[];
     onChange: (selected: number[]) => void;
-    disabled?: boolean; // 添加可选的 disabled 属性
+    disabled?: boolean;
 }
 
 const MultiSelect: React.FC<MultiSelectProps> = ({
     options,
     selected,
     onChange,
-    disabled = false // 设置默认值为 false
+    disabled = false 
 }) => {
     const handleSelect = (value: number) => {
-        if (disabled) return; // 如果禁用，直接返回
+        if (disabled) return; 
 
         if (selected.includes(value)) {
             onChange(selected.filter((item) => item !== value));
@@ -34,7 +33,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
                         type="checkbox"
                         checked={selected.includes(option.value)}
                         onChange={() => handleSelect(option.value)}
-                        disabled={disabled} // 添加 disabled 属性
+                        disabled={disabled} 
                     />
                     <span className="ml-2">{option.label}</span>
                 </label>
