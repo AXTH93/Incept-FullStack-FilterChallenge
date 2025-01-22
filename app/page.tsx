@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import MultiSelect from "./components/MultiSelect";
 import { fetchModules, fetchUnits, fetchLocations, validateFilters } from "./api/filters";
-import debounce from "lodash/debounce";
 
 interface Module {
     id: number;
@@ -21,84 +20,156 @@ interface Location {
 }
 
 const AnalyticsFilterPage = () => {
-    // State for filter options
-    const [modules, setModules] = useState<Module[]>([]); // List of available modules
-    const [units, setUnits] = useState<Unit[]>([]); // List of available units
-    const [locations, setLocations] = useState<Location[]>([]); // List of available locations
+    const [modules, setModules] = useState<Module[]>([]);
+    const [units, setUnits] = useState<Unit[]>([]);
+    const [locations, setLocations] = useState<Location[]>([]);
 
-    const [selectedModules, setSelectedModules] = useState<number[]>([]); // Selected module IDs
-    const [selectedUnits, setSelectedUnits] = useState<number[]>([]); // Selected unit IDs
-    const [selectedLocations, setSelectedLocations] = useState<number[]>([]); // Selected location IDs
+    const [selectedModules, setSelectedModules] = useState<number[]>([]);
+    const [selectedUnits, setSelectedUnits] = useState<number[]>([]);
+    const [selectedLocations, setSelectedLocations] = useState<number[]>([]);
 
-    const [isLoading, setIsLoading] = useState(false); // Loading state for data fetching
-    const [error, setError] = useState<string | null>(null); // Error message for data fetching
-    const [validationResult, setValidationResult] = useState<string | null>(null); // Result of filter validation
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [validationResult, setValidationResult] = useState<string | null>(null);
 
-    // Ref to manage loading timeout
     const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Generic fetchData function with a loading delay
-    const fetchData = async (modules: number[], units: number[], locations: number[]) => {
-        // Clear any previous loading timeout
-        if (loadingTimeoutRef.current) {
-            clearTimeout(loadingTimeoutRef.current);
-        }
-
-        // Set a loading delay: Only show loading state if the request takes longer than 500ms
-        loadingTimeoutRef.current = setTimeout(() => {
-            setIsLoading(true);
-        }, 500);
-
-        setError(null); // Reset any previous errors
-
+    // Load initial data
+    const fetchInitialData = async () => {
         try {
-            // Fetch data concurrently for modules, units, and locations
+            setIsLoading(true);
             const [modulesData, unitsData, locationsData] = await Promise.all([
-                fetchModules(units, locations),
-                fetchUnits(modules, locations),
-                fetchLocations(modules, units),
+                fetchModules([], []),
+                fetchUnits([], []),
+                fetchLocations([], [])
             ]);
-
-            // Update state with the fetched data
             setModules(modulesData);
             setUnits(unitsData);
             setLocations(locationsData);
         } catch (err) {
-            // Handle fetch errors
-            setError("Failed to load data. Please try again.");
-            console.error("Error fetching data:", err);
+            setError("Failed to load initial data. Please try again.");
+            console.error("Error fetching initial data:", err);
         } finally {
-            // Clear the loading timeout when the request finishes
-            if (loadingTimeoutRef.current) {
-                clearTimeout(loadingTimeoutRef.current);
-            }
-            setIsLoading(false); // Reset loading state
+            setIsLoading(false);
         }
     };
 
-    // UseMemo to optimize debounce with a delay of 800ms
-    const fetchDataWithDebounce = useMemo(
-        () =>
-            debounce((modules: number[], units: number[], locations: number[]) => {
-                fetchData(modules, units, locations);
-            }, 800),
-        [] // Dependencies are empty to ensure the debounce function is only created once
-    );
+    // Clean invalid selections
+    const cleanInvalidSelections = (newUnits: Unit[], newLocations: Location[]) => {
+        setSelectedUnits((prevSelectedUnits) =>
+            prevSelectedUnits.filter((unit) => newUnits.some((u) => u.id === unit))
+        );
+        setSelectedLocations((prevSelectedLocations) =>
+            prevSelectedLocations.filter((location) => newLocations.some((l) => l.id === location))
+        );
+    };
 
-    // Effect to trigger data fetching when filters change
-    useEffect(() => {
-        fetchDataWithDebounce(selectedModules, selectedUnits, selectedLocations);
+    // Handle changes in module selection
+    const handleModuleChange = async (moduleIds: number[]) => {
+        if (loadingTimeoutRef.current) {
+            clearTimeout(loadingTimeoutRef.current);
+        }
 
-        return () => {
-            // Cleanup
-            fetchDataWithDebounce.cancel();
+        setSelectedModules(moduleIds);
+        setError(null);
+
+        try {
+            loadingTimeoutRef.current = setTimeout(() => {
+                setIsLoading(true);
+            }, 500);
+
+            const [unitsData, locationsData] = await Promise.all([
+                fetchUnits(moduleIds, selectedLocations),
+                fetchLocations(moduleIds, selectedUnits)
+            ]);
+
+            setUnits(unitsData);
+            setLocations(locationsData);
+
+            // Clean invalid selections
+            cleanInvalidSelections(unitsData, locationsData);
+        } catch (err) {
+            setError("Failed to update filters. Please try again.");
+            console.error("Error updating filters:", err);
+        } finally {
             if (loadingTimeoutRef.current) {
                 clearTimeout(loadingTimeoutRef.current);
             }
-        };
-    }, [selectedModules, selectedUnits, selectedLocations]);
+            setIsLoading(false);
+        }
+    };
 
-    // Handle Apply Filters
+    // Handle changes in unit selection
+    const handleUnitChange = async (unitIds: number[]) => {
+        if (loadingTimeoutRef.current) {
+            clearTimeout(loadingTimeoutRef.current);
+        }
+
+        setSelectedUnits(unitIds);
+        setError(null);
+
+        try {
+            loadingTimeoutRef.current = setTimeout(() => {
+                setIsLoading(true);
+            }, 500);
+
+            const [locationsData, modulesData] = await Promise.all([
+                fetchLocations(selectedModules, unitIds),
+                fetchModules(unitIds, selectedLocations)
+            ]);
+
+            setLocations(locationsData);
+            setModules(modulesData);
+
+            // Clean invalid selections
+            cleanInvalidSelections(units, locationsData);
+        } catch (err) {
+            setError("Failed to update filters. Please try again.");
+            console.error("Error updating filters:", err);
+        } finally {
+            if (loadingTimeoutRef.current) {
+                clearTimeout(loadingTimeoutRef.current);
+            }
+            setIsLoading(false);
+        }
+    };
+
+    // Handle changes in location selection
+    const handleLocationChange = async (locationIds: number[]) => {
+        if (loadingTimeoutRef.current) {
+            clearTimeout(loadingTimeoutRef.current);
+        }
+
+        setSelectedLocations(locationIds);
+        setError(null);
+
+        try {
+            loadingTimeoutRef.current = setTimeout(() => {
+                setIsLoading(true);
+            }, 500);
+
+            const [unitsData, modulesData] = await Promise.all([
+                fetchUnits(selectedModules, locationIds),
+                fetchModules(selectedUnits, locationIds)
+            ]);
+
+            setUnits(unitsData);
+            setModules(modulesData);
+
+            // Clean invalid selections
+            cleanInvalidSelections(unitsData, locations);
+        } catch (err) {
+            setError("Failed to update filters. Please try again.");
+            console.error("Error updating filters:", err);
+        } finally {
+            if (loadingTimeoutRef.current) {
+                clearTimeout(loadingTimeoutRef.current);
+            }
+            setIsLoading(false);
+        }
+    };
+
+    // Handle applying filters
     const handleApplyFilters = async () => {
         setValidationResult(null);
         setError(null);
@@ -118,14 +189,24 @@ const AnalyticsFilterPage = () => {
         }
     };
 
-    // Handle Reset Filters
-    const handleResetFilters = () => {
+    // Handle resetting filters
+    const handleResetFilters = async () => {
         setSelectedModules([]);
         setSelectedUnits([]);
         setSelectedLocations([]);
-        fetchData([], [], []);
+        setValidationResult(null); // Clear validation result on reset
+        await fetchInitialData();
     };
 
+    // Initial data loading
+    useEffect(() => {
+        fetchInitialData();
+        return () => {
+            if (loadingTimeoutRef.current) {
+                clearTimeout(loadingTimeoutRef.current);
+            }
+        };
+    }, []);
 
     return (
         <div className="p-5">
@@ -145,7 +226,8 @@ const AnalyticsFilterPage = () => {
                         value: module.id,
                     }))}
                     selected={selectedModules}
-                    onChange={setSelectedModules}
+                    onChange={handleModuleChange}
+                    disabled={isLoading}
                 />
             </div>
             <div className="mt-4">
@@ -156,7 +238,8 @@ const AnalyticsFilterPage = () => {
                         value: unit.id,
                     }))}
                     selected={selectedUnits}
-                    onChange={setSelectedUnits}
+                    onChange={handleUnitChange}
+                    disabled={isLoading}
                 />
             </div>
             <div className="mt-4">
@@ -167,7 +250,8 @@ const AnalyticsFilterPage = () => {
                         value: location.id,
                     }))}
                     selected={selectedLocations}
-                    onChange={setSelectedLocations}
+                    onChange={handleLocationChange}
+                    disabled={isLoading}
                 />
             </div>
             <div className="mt-6">

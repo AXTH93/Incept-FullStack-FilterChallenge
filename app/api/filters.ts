@@ -2,24 +2,23 @@ import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:3001/api/filters';
 
-// Fetch all modules
+// Fetch available modules based on selected unit and location IDs
 export const fetchModules = async (
     unitIds?: number[],
     locationIds?: number[]
 ): Promise<{ id: number; title: string }[]> => {
     try {
-        // Build query parameters based on selected unit and location IDs
+
         const queryParams = {
             ...(unitIds?.length ? { unitIds: unitIds.join(",") } : {}),
             ...(locationIds?.length ? { locationIds: locationIds.join(",") } : {}),
         };
-
-        // Make a GET request to retrieve modules
+        // Make a GET request to retrieve available modules
         const response = await axios.get(`${API_BASE_URL}/modules`, {
             params: queryParams,
         });
 
-        // Return the modules array
+        // Return the modules result: { modules: Array<{ id: number, title: string }> }
         return response.data.modules;
     } catch (error) {
         console.error("Error fetching modules:", error);
@@ -33,18 +32,16 @@ export const fetchUnits = async (
     locationIds?: number[]
 ): Promise<{ id: number; name: string }[]> => {
     try {
-        // Build query parameters based on selected module and location IDs
+
         const queryParams = {
             ...(moduleIds?.length ? { moduleIds: moduleIds.join(",") } : {}),
             ...(locationIds?.length ? { locationIds: locationIds.join(",") } : {}),
         };
-
-        // Make a GET request to retrieve units
+        // Make a GET request to retrieve available units
         const response = await axios.get(`${API_BASE_URL}/units`, {
             params: queryParams,
         });
-
-        // Return the units array
+        // Return the units result: { units: Array<{ id: number, name: string }> }
         return response.data.units;
     } catch (error) {
         console.error("Error fetching units:", error);
@@ -58,7 +55,7 @@ export const fetchLocations = async (
     unitIds?: number[]
 ): Promise<{ id: number; name: string }[]> => {
     try {
-        // Build query parameters based on selected module and unit IDs
+
         const queryParams = {
             ...(moduleIds?.length ? { moduleIds: moduleIds.join(",") } : {}),
             ...(unitIds?.length ? { unitIds: unitIds.join(",") } : {}),
@@ -69,7 +66,7 @@ export const fetchLocations = async (
             params: queryParams,
         });
 
-        // Return the locations array
+        // Return the locations result: { locations: Array<{ id: number, name: string }> }
         return response.data.locations;
     } catch (error) {
         console.error("Error fetching locations:", error);
